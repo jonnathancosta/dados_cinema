@@ -21,7 +21,7 @@ def ler_generos_json(spark, caminho_arquivo):
     
     return df
 
-def main():
+def executar_ingestao_generos_ids():
     """
     Função principal que coordena o processo de ingestão
     """
@@ -36,7 +36,7 @@ def main():
         spark = criar_spark_session()
         
         # Caminho para o arquivo JSON
-        caminho_arquivo = "generos.json"
+        caminho_arquivo = "data/bronze/generos.json"
         
         # Lê os gêneros
         df_generos = ler_generos_json(spark, caminho_arquivo)
@@ -77,5 +77,3 @@ def main():
             spark.stop()
             print("\n[INFO] ✨ Sessão Spark encerrada")
 
-if __name__ == "__main__":
-    main()

@@ -1,15 +1,22 @@
+from typing import List, Dict, Optional
+from enum import Enum
+from dotenv import load_dotenv
+from pathlib import Path
+import os
 import requests
 import json
 import time
-from typing import List, Dict, Optional
-from enum import Enum
-from pathlib import Path
+
 
 class SortBy(Enum):
     """
     Enum com todas as opções de ordenação disponíveis na API do TMDB
     Documentação: https://developer.themoviedb.org/reference/discover-movie
     """
+    ORIGINAL_TITLE_DESC = "original_title.desc"
+    ORIGINAL_TITLE_ASC = "original_title.asc"
+    TITLE_DESC = "title.desc"
+    TITLE_ASC = "title.asc"
     POPULARITY_DESC = "popularity.desc"
     POPULARITY_ASC = "popularity.asc"
     REVENUE_DESC = "revenue.desc"
@@ -131,6 +138,9 @@ def salvar_filmes(filmes: List[Dict], nome_arquivo: str, formatado: bool = False
         return False
 
     try:
+        caminho_arquivo = Path(nome_arquivo)
+        diretorio = caminho_arquivo.parent
+        diretorio.mkdir(parents=True, exist_ok=True)
         with open(nome_arquivo, "a", encoding="utf-8") as f:
             for filme in filmes:
                 if formatado:
@@ -163,6 +173,9 @@ def salvar_generos(generos: List[Dict[str, str]], nome_arquivo: str = "generos.j
         return False
 
     try:
+        caminho_arquivo = Path(nome_arquivo)
+        diretorio = caminho_arquivo.parent
+        diretorio.mkdir(parents=True, exist_ok=True)
         with open(nome_arquivo, "w", encoding="utf-8") as f:
             json.dump(generos, f, ensure_ascii=False, indent=2)
         
@@ -172,3 +185,63 @@ def salvar_generos(generos: List[Dict[str, str]], nome_arquivo: str = "generos.j
     except Exception as e:
         print(f"Erro ao salvar arquivo: {e}")
         return False
+    
+    
+def executar_coleta():
+    """
+    Executa a coleta de filmes e gêneros da API TMDB
+    salvando os dados em arquivos .jsonl.
+    """
+    # Carregar variáveis do .env
+    load_dotenv()
+    TOKEN = os.getenv("TMDB_API_TOKEN")
+    if not TOKEN:
+        raise ValueError("⚠️ TOKEN da TMDB não encontrado no arquivo .env")
+
+    coletor = TMDBCollector(TOKEN)
+
+    prefixo_diretorio = "data/bronze/dados_brutos_filmes"
+    
+    # Configurações de coleta
+    coletas = [
+        {"sort_by": SortBy.ORIGINAL_TITLE_DESC, "arquivo": "filmes_por_titulo_original_desc.jsonl"},
+        {"sort_by": SortBy.ORIGINAL_TITLE_ASC, "arquivo": "filmes_por_titulo_original_asc.jsonl"},
+        {"sort_by": SortBy.TITLE_DESC, "arquivo": "filmes_por_titulo_desc.jsonl"},
+        {"sort_by": SortBy.TITLE_ASC, "arquivo": "filmes_por_titulo_asc.jsonl"},
+        {"sort_by": SortBy.POPULARITY_ASC, "arquivo": "filmes_por_popularidade_asc.jsonl"},
+        {"sort_by": SortBy.VOTE_AVERAGE_DESC, "arquivo": "filmes_por_avaliacao_desc.jsonl"},
+        {"sort_by": SortBy.VOTE_AVERAGE_ASC, "arquivo": "filmes_por_avaliacao_asc.jsonl"},
+        {"sort_by": SortBy.PRIMARY_RELEASE_DATE_DESC, "arquivo": "filmes_por_data_desc.jsonl"},
+        {"sort_by": SortBy.PRIMARY_RELEASE_DATE_ASC, "arquivo": "filmes_por_data_asc.jsonl"},
+        {"sort_by": SortBy.REVENUE_DESC, "arquivo": "filmes_por_receita_desc.jsonl"},
+        {"sort_by": SortBy.REVENUE_ASC, "arquivo": "filmes_por_receita_asc.jsonl"},
+        {"sort_by": SortBy.VOTE_COUNT_DESC, "arquivo": "filmes_por_num_votos_desc.jsonl"},
+        {"sort_by": SortBy.VOTE_COUNT_ASC, "arquivo": "filmes_por_num_votos_asc.jsonl"}
+    ]
+
+    # Executa a coleta para cada configuração
+    for coleta in coletas:
+        print(f"\n{'='*50}")
+        print(f"Coletando filmes ordenados por: {coleta['sort_by'].value}")
+        print(f"{'='*50}\n")
+
+        filmes = coletor.coletar_filmes(
+            sort_by=coleta["sort_by"],
+            pagina_inicial=1,
+            quantidade_paginas=500
+        )
+
+        if filmes:
+            caminho_completo = prefixo_diretorio + coleta["arquivo"]
+            salvar_filmes(
+                filmes,
+                nome_arquivo=caminho_completo,
+                formatado=True
+            )
+
+    # Coleta e salva os gêneros
+    generos = coletor.coletar_ids_generos()
+    if generos:
+        salvar_generos(generos)
+
+    print("\n✅ Coleta concluída com sucesso!")

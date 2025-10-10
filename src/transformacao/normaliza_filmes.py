@@ -84,8 +84,7 @@ def ler_filmes_generos_json(spark, path):
         df_temp = spark.read.json(arquivo)
         df = df.union(df_temp)
         
-    # Remove duplicatas baseado no ID
-    df = df.dropDuplicates(['id'])
+ 
     # Seleciona apenas as colunas necessárias e explode os gêneros
     df = df.select("id", "genre_ids") \
         .where("genre_ids is not null") \
@@ -94,7 +93,7 @@ def ler_filmes_generos_json(spark, path):
     
     return df
 
-def main():
+def executar_ingestao_filmes():
     """
     Função principal que coordena o processo de ingestão
     """
@@ -109,7 +108,7 @@ def main():
         spark = criar_spark_session()
         
         # Encontra todos os arquivos JSONL
-        path = "dados_brutos_filmes"
+        path = "data/bronze/dados_brutos_filmes"
         df_filmes = ler_filmes_json(spark, path)
         df_filmes_generos = ler_filmes_generos_json(spark, path)
         
@@ -143,9 +142,7 @@ def main():
                 print("[INFO] 📝 Iniciando inserção dos dados...")
                 
                 # Cria uma visão temporária do DataFrame
-                df_filmes.createOrReplaceTempView("filmes_temp")
-
-                # Executa o INSERT IGNORE via JDBC
+                
                 df_filmes.write \
                     .mode("append") \
                     .option("createTableColumnTypes", "id BIGINT PRIMARY KEY") \
@@ -171,9 +168,9 @@ def main():
                     
                     # Filtra apenas gêneros válidos
                     df_filmes_generos = df_filmes_generos.filter(col("id_genero").isin(generos_validos))
-                    
+                    df_filmes_generos = df_filmes_generos.dropDuplicates()
                     total_relacoes = df_filmes_generos.count()
-                    print(f"[INFO] 📈 Total de relações filme-gênero válidas: {total_relacoes}")
+                    print(f"[INFO] 📈 Total de relações filme-gênero válidas e sem duplicidades: {total_relacoes}")
                     
                     if total_relacoes > 0:
                         # Insere os gêneros válidos
@@ -208,6 +205,3 @@ def main():
         if 'spark' in locals():
             spark.stop()
             print("\n[INFO] ✨ Sessão Spark encerrada")
-
-if __name__ == "__main__":
-    main()

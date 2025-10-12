@@ -36,7 +36,8 @@ def criar_tabela_filmes(engine: sa.engine.base.Engine) -> bool:
         CREATE TABLE filmes (
             id int not null  primary key,
             titulo VARCHAR(255),
-            data_lancamento varchar(12),
+            idioma_original CHAR(2),
+            data_lancamento date,
             nota_media double,
             total_votos double,
             popularidade double

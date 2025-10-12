@@ -1,6 +1,7 @@
 from pyspark.sql import SparkSession
 import os
 from dotenv import load_dotenv
+
 def criar_spark_session():
     """
     Cria e retorna uma sessão Spark
@@ -64,7 +65,7 @@ def executar_ingestao_generos_ids():
                     table="generos",
                     properties=properties
                 )
-            print("[INFO] ✅ Dados carregados no MySQL com sucesso!")
+            print("[INFO] ✅ Dados de generos carregados no MySQL com sucesso!")
             
         except Exception as e:
             print(f"[ERRO] ❌ Falha ao gravar no MySQL: {str(e)}")

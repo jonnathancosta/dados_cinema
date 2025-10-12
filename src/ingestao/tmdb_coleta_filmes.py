@@ -160,7 +160,7 @@ def salvar_filmes(filmes: List[Dict], nome_arquivo: str, formatado: bool = False
         print(f"Erro ao salvar arquivo: {e}")
         return False
 
-def salvar_generos(generos: List[Dict[str, str]], nome_arquivo: str = "generos.json") -> bool:
+def salvar_generos(generos: List[Dict[str, str]], nome_arquivo: str, formatado: bool = False) -> bool:
     """
     Salva os gêneros em um arquivo JSON
     
@@ -240,8 +240,10 @@ def executar_coleta():
             )
 
     # Coleta e salva os gêneros
+    prefixo_diretorio_generos = "data/bronze/"
     generos = coletor.coletar_ids_generos()
     if generos:
-        salvar_generos(generos)
+        caminho_completo = prefixo_diretorio_generos + "generos.json"
+        salvar_generos(generos, nome_arquivo=caminho_completo, formatado=True)
 
     print("\n✅ Coleta concluída com sucesso!")

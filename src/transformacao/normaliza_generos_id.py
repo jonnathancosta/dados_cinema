@@ -47,7 +47,7 @@ def executar_ingestao_generos_ids():
         
         print("\n[INFO] Amostra dos dados:")
         df_generos.show(5, truncate=False)
-        
+        df_generos.write.mode("overwrite").parquet("data/silver/tabela_generos")
         # Configuração do MySQL
         url = f"jdbc:mysql://{host}:{port}/{database}"
         properties = {

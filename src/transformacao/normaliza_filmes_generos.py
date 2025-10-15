@@ -1,9 +1,10 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import explode, col, to_date, current_date, trim
 from dotenv import load_dotenv
+from pathlib import Path
 import os
 import glob
-
+import shutil
 
 
 def criar_spark_session():
@@ -14,13 +15,14 @@ def criar_spark_session():
         .appName("TMDb ETL - FIlmes") \
         .config("spark.jars.packages", "mysql:mysql-connector-java:8.0.33") \
         .config("spark.sql.shuffle.partitions", "1") \
+        .config("spark.sql.execution.pyspark.udf.faulthandler.enabled", "true") \
         .config("spark.default.parallelism", "1") \
         .config("spark.sql.execution.arrow.pyspark.enabled", "true") \
+        .config("spark.driver.memory", "7g") \
+        .config("spark.python.worker.faulthandler.enabled", "true") \
         .config("spark.hadoop.io.nativeio.NativeIO.disable.load", "true") \
         .getOrCreate()
-
-os.environ["HADOOP_OPTS"] = "-Djava.library.path="
-
+        
 def limpar_dados(df):
     count_inicial = df.count()
     df = df.dropDuplicates(["id"])
@@ -36,7 +38,6 @@ def limpar_dados(df):
     print(f"🧹 Registros removidos: {count_inicial - count_final}")
 
     return df_filtrado
-
 
 def ler_filmes_json(spark, path):
     """
@@ -121,6 +122,20 @@ def ler_filmes_generos_json(spark, path):
     df = df.drop_duplicates()
     return df
 
+def salvar_tabelas_parquet(df, caminho_parquet: str, num_particoes: int = 1) -> bool:
+    """Salva um Spark DataFrame de forma distribuída (múltiplos arquivos)"""
+    if df is None or df.rdd.isEmpty():
+        print("Nenhum dado para salvar!")
+        return False
+        
+    print(f"🔄 Gravando DataFrame distribuído em: {caminho_parquet}")
+    
+    
+    df.repartition(num_particoes).write.mode("overwrite").parquet(caminho_parquet)
+    
+    print(f"✅ Arquivos salvos com sucesso no diretório: {caminho_parquet}")
+    return True
+
 def executar_ingestao_filmes():
     """
     Função principal que coordena o processo de ingestão
@@ -139,6 +154,7 @@ def executar_ingestao_filmes():
         path = "data/bronze/dados_brutos_filmes"
         df_filmes = ler_filmes_json(spark, path)
         df_filmes_generos = ler_filmes_generos_json(spark, path)
+
         # Configuração do MySQL
         url = f"jdbc:mysql://{host}:{port}/{database}"
         properties = {
@@ -151,7 +167,6 @@ def executar_ingestao_filmes():
         if df_filmes is None:
             print("[AVISO] ⚠️ Nenhum dado para processar")
             return
-
         # Conta total de registros antes do processamento
         total_registros = df_filmes.count()
         print(f"[INFO] 📊 Total de linhas sobre filmes a processar: {total_registros}")
@@ -161,14 +176,14 @@ def executar_ingestao_filmes():
             "batchsize": "1000",
             "rewriteBatchedStatements": "true"
         })
-
+        
+        caminho_parquet = "data/silver/tabela_filmes/filmes.parquet"
+        salvar_tabelas_parquet(df_filmes, caminho_parquet, num_particoes=2)
+        
         # Coalesce para uma única partição
-        df_filmes = df_filmes.coalesce(1)
-
+        df_filmes = df_filmes.coalesce(1) # Reduz para 1 partição para evitar múltiplos arquivos
         try:
-            print("[INFO] 📝 Iniciando inserção dos dados...")
-            
-            # Cria uma visão temporária do DataFrame
+     
             
             df_filmes.write \
                 .mode("append") \
@@ -196,11 +211,19 @@ def executar_ingestao_filmes():
                     
                     # Filtra apenas gêneros válidos
                     df_filmes_generos = df_filmes_generos.filter(col("id_genero").isin(generos_validos))
+                    
+                    caminho_parquet="data/silver/tabela_filmes_generos/filmes_generos.parquet"
+                      
+                    print("[INFO] 🧪 Forçando a materialização (cache) do DataFrame...")
+                    
+                    df_filmes_generos = df_filmes_generos.cache()
+                    # Conta total de relações filme-gênero e força a ação do cache
                     total_relacoes = df_filmes_generos.count()
+                    
                     print(f"[INFO] 📈 Total de relações filme-gênero: {total_relacoes}")
                     
                     if total_relacoes > 0:
-                        # Insere os gêneros válidos
+                        # Insere os gêneros válidos                         
                         df_filmes_generos.write \
                             .mode("append") \
                             .option("createTableColumnTypes", "id BIGINT, id_genero INT") \
@@ -211,7 +234,12 @@ def executar_ingestao_filmes():
                                 properties=properties
                             )      
                             
-                        print("[INFO] ✅ Dados de filmes_geneos inseridos com sucesso!")  
+                        print("[INFO] ✅ Dados de filmes_geneos inseridos com sucesso!")
+                        
+                salvar_tabelas_parquet(df_filmes_generos, caminho_parquet, num_particoes=10)
+                df_filmes_generos.unpersist()
+                    
+ 
             
             except Exception as e:
                 print(f"[ERRO] ❌ Falha ao processar filmes_generos: {str(e)}")

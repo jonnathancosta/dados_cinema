@@ -104,10 +104,10 @@ def estruturar_tabela_filmes_generos(engine: sa.engine.base.Engine) -> bool:
     """
 
     # Instrução 1: Adicionar FK para generos
-    query1 = "ALTER TABLE filmes_generos ADD CONSTRAINT fk_id_genero FOREIGN KEY (id_genero) REFERENCES generos(id)"
+    query1 = "ALTER TABLE filmes_generos ADD CONSTRAINT fk_id_genero FOREIGN KEY (id_genero) REFERENCES generos(id);"
     
     # Instrução 2: Adicionar FK para filmes
-    query2 = "ALTER TABLE filmes_generos ADD CONSTRAINT fk_id_filme FOREIGN KEY (id_filme) REFERENCES filmes(id)"
+    query2 = "ALTER TABLE filmes_generos ADD CONSTRAINT fk_id_filme FOREIGN KEY (id_filme) REFERENCES filmes(id);"
 
     try:
         with engine.connect() as connection:

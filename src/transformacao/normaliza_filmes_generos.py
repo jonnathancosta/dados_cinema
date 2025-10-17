@@ -18,7 +18,7 @@ def criar_spark_session():
         .config("spark.sql.execution.pyspark.udf.faulthandler.enabled", "true") \
         .config("spark.default.parallelism", "1") \
         .config("spark.sql.execution.arrow.pyspark.enabled", "true") \
-        .config("spark.driver.memory", "7g") \
+        .config("spark.driver.memory", "4g") \
         .config("spark.python.worker.faulthandler.enabled", "true") \
         .config("spark.hadoop.io.nativeio.NativeIO.disable.load", "true") \
         .getOrCreate()

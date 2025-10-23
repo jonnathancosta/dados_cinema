@@ -1,11 +1,8 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import explode, col, to_date, current_date, trim
+from pyspark.sql.functions import explode, col, create_map, current_date, trim, lit
 from dotenv import load_dotenv
-from pathlib import Path
 import os
 import glob
-import shutil
-
 
 def criar_spark_session():
     """
@@ -69,10 +66,139 @@ def ler_filmes_json(spark, path):
         "vote_count as total_votos"
     )
     
+     # Dicionário de códigos ISO 639-1-> idioma em português
+    idiomas = {
+        "ho": "Hiri Motu",
+        "cn": "Chinês",
+        "tn": "Tswana",
+        "te": "Telugu",
+        "cy": "Galês",
+        "tl": "Tagalo",
+        "ja": "Japonês",
+        "sd": "Sindi",
+        "hi": "Hindi",
+        "ml": "Malaiala",
+        "mi": "Maori",
+        "ta": "Tâmil",
+        "en": "Inglês",
+        "no": "Norueguês",
+        "zh": "Chinês",
+        "mr": "Marata",
+        "ko": "Coreano",
+        "ms": "Malaio",
+        "it": "Italiano",
+        "ga": "Irlandês",
+        "th": "Tailandês",
+        "bn": "Bengali",
+        "kn": "Canarês",
+        "pa": "Panjabi",
+        "ur": "Urdu",
+        "ru": "Russo",
+        "cs": "Checo",
+        "es": "Espanhol",
+        "is": "Islandês",
+        "fr": "Francês",
+        "id": "Indonésio",
+        "fi": "Finlandês",
+        "sv": "Sueco",
+        "bo": "Tibetano",
+        "nl": "Holandês",
+        "de": "Alemão",
+        "el": "Grego",
+        "sk": "Eslovaco",
+        "ht": "Haitiano",
+        "la": "Latim",
+        "ar": "Árabe",
+        "bs": "Bósnio",
+        "hu": "Húngaro",
+        "da": "Dinamarquês",
+        "he": "Hebraico",
+        "tr": "Turco",
+        "sl": "Esloveno",
+        "bg": "Búlgaro",
+        "af": "Afrikaans",
+        "et": "Estoniano",
+        "si": "Cingalês",
+        "sr": "Sérvio",
+        "pl": "Polaco",
+        "sh": "Servo-Croata",
+        "eu": "Basco",
+        "lv": "Letão",
+        "fa": "Persa",
+        "ne": "Nepalês",
+        "mn": "Mongol",
+        "ca": "Catalão",
+        "ro": "Romeno",
+        "lt": "Lituano",
+        "hy": "Armênio",
+        "pt": "Português",
+        "gu": "Gujarati",
+        "sq": "Albanês",
+        "ig": "Igbo",
+        "hr": "Croata",
+        "vi": "Vietnamita",
+        "ku": "Curdo",
+        "tg": "Tadjique",
+        "sn": "Shona",
+        "yi": "Iídiche",
+        "yo": "Yoruba",
+        "lb": "Luxemburguês",
+        "az": "Azerbaijano",
+        "mk": "Macedônio",
+        "tt": "Tártaro",
+        "xx": "Indeterminado",
+        "ka": "Georgiano",
+        "mt": "Maltês",
+        "am": "Amárico",
+        "uk": "Ucraniano",
+        "mg": "Malgaxe",
+        "kk": "Cazaque",
+        "cr": "Cree",
+        "ps": "Pastó",
+        "ak": "Acan",
+        "zu": "Zulu",
+        "dz": "Dzongkha",
+        "nb": "Bokmål Norueguês",
+        "my": "Birmanês",
+        "gl": "Galego",
+        "sw": "Suaíli",
+        "sc": "Sardo",
+        "be": "Bielorrusso",
+        "km": "Khmer",
+        "ab": "Abcásio",
+        "ia": "Interlíngua",
+        "qu": "Quéchua",
+        "kw": "Córnico",
+        "uz": "Uzbeque",
+        "fo": "Feroês",
+        "ha": "Hauçá",
+        "as": "Assamês",
+        "ky": "Quirguiz",
+        "fj": "Fijiano",
+        "wo": "Wolof",
+        "or": "Oriya",
+        "jv": "Javanês",
+        "to": "Tonganês",
+        "gd": "Gaélico Escocês",
+        "gn": "Guarani",
+        "bm": "Bambara",
+        "br": "Bretão",
+        "se": "Sami do Norte",
+        "iu": "Inuktitut",
+        "ss": "Swati",
+        "lo": "Lao",
+        "fy": "Frísio Ocidental",
+        "nn": "Norueguês Nynorsk",
+        "ng": "Ndonga",
+        "tk": "Turcomano",
+        "ts": "Tsonga"
+    }
+    
+    mapping_expr = create_map([lit(x) for kv in idiomas.items() for x in kv])
 
+    df = df.withColumn("idioma_original", mapping_expr[col("idioma_original")])
+    
     return df
-
-
 
 def ler_generos_validos(spark, url, properties):
     """
@@ -92,8 +218,6 @@ def ler_generos_validos(spark, url, properties):
     except Exception as e:
         print(f"[AVISO] ⚠️ Não foi possível ler os gêneros: {str(e)}")
         return []
-
-
 
 def ler_filmes_generos_json(spark, path):
     
@@ -177,7 +301,7 @@ def executar_ingestao_filmes():
             "rewriteBatchedStatements": "true"
         })
         
-        caminho_parquet = "data/silver/tabela_filmes/filmes.parquet"
+        caminho_parquet = "data/silver/tabela_filmes"
         salvar_tabelas_parquet(df_filmes, caminho_parquet, num_particoes=2)
         
         # Coalesce para uma única partição
@@ -212,7 +336,7 @@ def executar_ingestao_filmes():
                     # Filtra apenas gêneros válidos
                     df_filmes_generos = df_filmes_generos.filter(col("id_genero").isin(generos_validos))
                     
-                    caminho_parquet="data/silver/tabela_filmes_generos/filmes_generos.parquet"
+                    caminho_parquet="data/silver/tabela_filmes_generos/"
                       
                     print("[INFO] 🧪 Forçando a materialização (cache) do DataFrame...")
                     
